@@ -65,7 +65,11 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
             self.lock_keeper.unlock(self)
 
         result = parameters[0]
-        os.remove(self.bundle_dl_location)
+        try:
+            os.remove(self.bundle_dl_location)
+        except Error as e:
+            self.logger.warning('Error removing update bundle')
+            self.logger.warning(str(e))
         status_msg = 'Rauc bundle update completed with result: {}'.format(
             result)
         self.logger.info(status_msg)
