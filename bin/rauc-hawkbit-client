@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import asyncio_glib
 import aiohttp
-import gbulb
 from configparser import ConfigParser
 from pathlib import Path
 import logging
@@ -83,6 +83,6 @@ async def main():
 
 if __name__ == '__main__':
     # create event loop, open aiohttp client session and start polling
-    gbulb.install()
+    asyncio.set_event_loop_policy(asyncio_glib.GLibEventLoopPolicy())
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
