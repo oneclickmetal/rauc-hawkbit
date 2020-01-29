@@ -15,7 +15,6 @@ setup(
       install_requires=[
           'aiohttp==3.6.2',
           'asyncio-glib==0.1',
-          'pycairo==1.19.0',
           'PyGObject==3.34.0'
       ],
       packages=find_packages(),
