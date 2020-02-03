@@ -8,9 +8,21 @@ from configparser import ConfigParser
 from pathlib import Path
 import logging
 import argparse
+import socket
 
 from rauc_hawkbit.rauc_dbus_ddi_client import RaucDBUSDDIClient
 
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        ip_address = s.getsockname()[0]
+    except:
+        ip_address = '127.0.0.1'
+    finally:
+        s.close()
+    return ip_address
 
 def result_callback(result):
     print("Result:   {}".format('SUCCESSFUL' if result == 0 else 'FAILED' ))
@@ -60,12 +72,19 @@ async def main():
         LOG_LEVEL = logging.INFO
 
     HOST = config.get('client', 'hawkbit_server')
-    SSL = config.getboolean('client', 'ssl')
-    TENANT_ID = config.get('client', 'tenant_id')
+    SSL = config.getboolean('client', 'ssl', fallback=True)
+    TENANT_ID = config.get('client', 'tenant_id', fallback='DEFAULT')
     TARGET_NAME = config.get('client', 'target_name')
     AUTH_TOKEN = config.get('client', 'auth_token')
-    ATTRIBUTES = {'MAC':config.get('client', 'mac_address')}
     BUNDLE_DL_LOCATION = config.get('client', 'bundle_download_location')
+
+    ATTRIBUTES = {}
+    if 'attributes' in config:
+        for key in config['attributes']:
+            ATTRIBUTES[key] = config.get('attributes', key)
+
+    if config.getboolean('client', 'include_ip_address', fallback=False):
+        ATTRIBUTES['ip_address'] = get_ip()
 
     if args.debug:
         LOG_LEVEL = logging.DEBUG
