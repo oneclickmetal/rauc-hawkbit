@@ -29,8 +29,11 @@ Then setup your configuration file:
   tenant_id = DEFAULT
   target_name = test-target
   auth_token = bhVahL1Il1shie2aj2poojeChee6ahShu
-  mac_address = 12:34:56:78:9A:BC
   bundle_download_location = /tmp/bundle.raucb
+  include_ip_address = False
+
+  [attributes]
+  my_custom_attribute = Test
 
 Finally start the client application:
 
