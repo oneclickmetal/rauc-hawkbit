@@ -25,7 +25,8 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
     interface.
     """
     def __init__(self, session, host, ssl, tenant_id, target_name, auth_token,
-                 attributes, bundle_dl_location, result_callback, step_callback=None, lock_keeper=None):
+                 attributes, bundle_dl_location, result_callback, step_callback=None,
+                 lock_keeper=None, on_update_available=None, on_bundle_downloaded=None):
         super(RaucDBUSDDIClient, self).__init__()
 
         self.attributes = attributes
@@ -53,6 +54,9 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
                                        'LastError', self.last_error_callback)
         self.new_signal_subscription('de.pengutronix.rauc.Installer',
                                      'Completed', self.complete_callback)
+
+        self.on_update_available = on_update_available
+        self.on_bundle_downloaded = on_bundle_downloaded
 
     async def complete_callback(self, connection, sender_name, object_path,
                                 interface_name, signal_name, parameters):
@@ -230,6 +234,10 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         self.logger.info('Starting bundle download')
         await self.download_artifact(action_id, download_url, md5_hash)
 
+        continuation = self.on_bundle_downloaded or self.trigger_installation
+        await continuation(action_id)
+
+    async def trigger_installation(self, action_id):
         # download successful, start install
         self.logger.info('Starting installation')
         try:
@@ -300,7 +308,8 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
                 if 'configData' in base['_links']:
                     await self.identify(base)
                 if 'deploymentBase' in base['_links']:
-                    await self.process_deployment(base)
+                    continuation = self.on_update_available or self.process_deployment
+                    await continuation(base)
                 if 'cancelAction' in base['_links']:
                     await self.cancel(base)
 
