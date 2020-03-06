@@ -4,6 +4,7 @@ import asyncio
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError
 from gi.repository import GLib
 from datetime import datetime, timedelta
+import hashlib
 import os
 import os.path
 import re
@@ -258,6 +259,20 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
                     status_execution, status_result, [str(e)])
             raise APIError(str(e))
 
+    def bundle_already_downloaded(self, bundle_location, md5):
+        self.logger.debug(f'Checking if file with md5 {md5} already exists')
+
+        do_hashes_match = False
+        try:
+            hash_md5 = hashlib.md5()
+            with open(bundle_location, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            self.logger.debug(f'existing bundle hash: {hash_md5.hexdigest()} vs hawkbit: {md5}')
+            do_hashes_match = hash_md5.hexdigest() == md5
+        finally:
+            return do_hashes_match
+
     async def download_artifact(self, action_id, url, md5sum,
                                 tries=3):
         """Download bundle artifact."""
@@ -270,6 +285,11 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
 
         if self.step_callback:
             self.step_callback(0, "Downloading bundle...")
+
+        bundle_exists = self.bundle_already_downloaded(self.bundle_dl_location, md5sum)
+        if bundle_exists:
+            self.logger.info("Bundle already on disk .. skipping download")
+            return
 
         # try several times
         for dl_try in range(tries):
