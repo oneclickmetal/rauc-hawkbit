@@ -186,10 +186,22 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         Check for deployments, download them, verify checksum and trigger
         RAUC install operation.
         """
-        await self.process_download(base)
+        action_id, deploy_info = await self.retrieve_deployment_information(base)
+        await self.process_download(action_id, deploy_info)
         await self.process_installation()
 
-    async def process_download(self, base):
+    async def retrieve_deployment_information(self, base):
+        # retrieve action id and resource parameter from URL
+        deployment = base['_links']['deploymentBase']['href']
+        match = re.search('/deploymentBase/(.+)\\?c=(.+)$', deployment)
+        action_id, resource = match.groups()
+        self.logger.info('Deployment found for this target')
+        # fetch deployment information
+        deploy_info = await self.ddi.deploymentBase[action_id](resource)
+        return action_id, deploy_info
+
+
+    async def process_download(self, action_id, deploy_info):
         """
         Check for deployments, download them and verify checksum.
         """
@@ -197,13 +209,6 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
             self.logger.info('Deployment is already in progress')
             return
 
-        # retrieve action id and resource parameter from URL
-        deployment = base['_links']['deploymentBase']['href']
-        match = re.search('/deploymentBase/(.+)\?c=(.+)$', deployment)
-        action_id, resource = match.groups()
-        self.logger.info('Deployment found for this target')
-        # fetch deployment information
-        deploy_info = await self.ddi.deploymentBase[action_id](resource)
         try:
             chunk = deploy_info['deployment']['chunks'][0]
         except IndexError:
