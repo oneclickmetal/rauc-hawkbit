@@ -185,6 +185,13 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         Check for deployments, download them, verify checksum and trigger
         RAUC install operation.
         """
+        await self.process_download(base)
+        await self.process_installation()
+
+    async def process_download(self, base):
+        """
+        Check for deployments, download them and verify checksum.
+        """
         if self.action_id is not None:
             self.logger.info('Deployment is already in progress')
             return
@@ -230,17 +237,24 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         self.logger.info('Starting bundle download')
         await self.download_artifact(action_id, download_url, md5_hash)
 
-        # download successful, start install
+        self.action_id = action_id
+
+    async def process_installation(self):
+        """
+        Trigger RAUC install operation for an already downloaded bundle.
+        """
         self.logger.info('Starting installation')
+        if self.action_id is None:
+            self.logger.info('No Deployment in progress')
+            return
         try:
-            self.action_id = action_id
             # do not interrupt install call
             await asyncio.shield(self.install())
         except GLib.Error as e:
             # send negative feedback to HawkBit
             status_execution = DeploymentStatusExecution.closed
             status_result = DeploymentStatusResult.failure
-            await self.ddi.deploymentBase[action_id].feedback(
+            await self.ddi.deploymentBase[self.action_id].feedback(
                     status_execution, status_result, [str(e)])
             raise APIError(str(e))
 
