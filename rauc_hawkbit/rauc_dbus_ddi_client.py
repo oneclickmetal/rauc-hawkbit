@@ -4,6 +4,7 @@ import asyncio
 from aiohttp.client_exceptions import ClientOSError, ClientResponseError
 from gi.repository import GLib
 from datetime import datetime, timedelta
+import hashlib
 import os
 import os.path
 import re
@@ -185,17 +186,29 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         Check for deployments, download them, verify checksum and trigger
         RAUC install operation.
         """
-        if self.action_id is not None:
-            self.logger.info('Deployment is already in progress')
-            return
+        action_id, deploy_info = await self.retrieve_deployment_information(base)
+        await self.process_download(action_id, deploy_info)
+        await self.process_installation()
 
+    async def retrieve_deployment_information(self, base):
         # retrieve action id and resource parameter from URL
         deployment = base['_links']['deploymentBase']['href']
-        match = re.search('/deploymentBase/(.+)\?c=(.+)$', deployment)
+        match = re.search('/deploymentBase/(.+)\\?c=(.+)$', deployment)
         action_id, resource = match.groups()
         self.logger.info('Deployment found for this target')
         # fetch deployment information
         deploy_info = await self.ddi.deploymentBase[action_id](resource)
+        return action_id, deploy_info
+
+
+    async def process_download(self, action_id, deploy_info):
+        """
+        Check for deployments, download them and verify checksum.
+        """
+        if self.action_id is not None:
+            self.logger.info('Deployment is already in progress')
+            return
+
         try:
             chunk = deploy_info['deployment']['chunks'][0]
         except IndexError:
@@ -230,19 +243,40 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         self.logger.info('Starting bundle download')
         await self.download_artifact(action_id, download_url, md5_hash)
 
-        # download successful, start install
+        self.action_id = action_id
+
+    async def process_installation(self):
+        """
+        Trigger RAUC install operation for an already downloaded bundle.
+        """
         self.logger.info('Starting installation')
+        if self.action_id is None:
+            self.logger.info('No Deployment in progress')
+            return
         try:
-            self.action_id = action_id
             # do not interrupt install call
             await asyncio.shield(self.install())
         except GLib.Error as e:
             # send negative feedback to HawkBit
             status_execution = DeploymentStatusExecution.closed
             status_result = DeploymentStatusResult.failure
-            await self.ddi.deploymentBase[action_id].feedback(
+            await self.ddi.deploymentBase[self.action_id].feedback(
                     status_execution, status_result, [str(e)])
             raise APIError(str(e))
+
+    def bundle_already_downloaded(self, bundle_location, md5):
+        self.logger.debug(f'Checking if file with md5 {md5} already exists')
+
+        do_hashes_match = False
+        try:
+            hash_md5 = hashlib.md5()
+            with open(bundle_location, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            self.logger.debug(f'existing bundle hash: {hash_md5.hexdigest()} vs hawkbit: {md5}')
+            do_hashes_match = hash_md5.hexdigest() == md5
+        finally:
+            return do_hashes_match
 
     async def download_artifact(self, action_id, url, md5sum,
                                 tries=3):
@@ -256,6 +290,11 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
 
         if self.step_callback:
             self.step_callback(0, "Downloading bundle...")
+
+        bundle_exists = self.bundle_already_downloaded(self.bundle_dl_location, md5sum)
+        if bundle_exists:
+            self.logger.info("Bundle already on disk .. skipping download")
+            return
 
         # try several times
         for dl_try in range(tries):
