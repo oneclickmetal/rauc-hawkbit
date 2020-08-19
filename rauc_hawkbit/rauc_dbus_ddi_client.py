@@ -160,7 +160,7 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
                 ConfigStatusExecution.closed,
                 ConfigStatusResult.success, **self.attributes)
 
-    async def cancel(self, base):
+    async def reject_cancel(self, base):
         self.logger.info('Received cancelation request')
         # retrieve action id from URL
         deployment = base['_links']['cancelAction']['href']
@@ -173,6 +173,20 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         self.logger.info('Rejecting cancelation request')
         await self.ddi.cancelAction[stop_id].feedback(
                 CancelStatusExecution.rejected, CancelStatusResult.success, status_details=("Cancelling not supported",))
+
+    async def cancel(self, base):
+        self.logger.info('Received cancelation request')
+        # retrieve action id from URL
+        deployment = base['_links']['cancelAction']['href']
+        match = re.search('/cancelAction/(.+)$', deployment)
+        action_id, = match.groups()
+        # retrieve stop_id
+        stop_info = await self.ddi.cancelAction[action_id]()
+        stop_id = stop_info['cancelAction']['stopId']
+        # Reject cancel request
+        self.logger.info('Accept cancelation request')
+        await self.ddi.cancelAction[stop_id].feedback(
+                CancelStatusExecution.canceled, CancelStatusResult.success, status_details=("Cancelled",))
 
     async def install(self):
         if self.lock_keeper and not self.lock_keeper.lock(self):
@@ -341,6 +355,6 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
                 if 'deploymentBase' in base['_links']:
                     await self.process_deployment(base)
                 if 'cancelAction' in base['_links']:
-                    await self.cancel(base)
+                    await self.reject_cancel(base)
 
             await self.sleep(base)
