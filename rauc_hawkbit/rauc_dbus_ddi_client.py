@@ -186,7 +186,7 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         # Reject cancel request
         self.logger.info('Accept cancelation request')
         await self.ddi.cancelAction[stop_id].feedback(
-                CancelStatusExecution.canceled, CancelStatusResult.success, status_details=("Cancelled",))
+                CancelStatusExecution.closed, CancelStatusResult.success, status_details=("Cancelled",))
 
     async def install(self):
         if self.lock_keeper and not self.lock_keeper.lock(self):
