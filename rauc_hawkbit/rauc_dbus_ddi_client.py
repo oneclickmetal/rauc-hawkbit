@@ -188,12 +188,12 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         await self.ddi.cancelAction[stop_id].feedback(
                 CancelStatusExecution.closed, CancelStatusResult.success, status_details=("Cancelled",))
 
-    async def install(self):
+    async def install(self, custom_bundle_location=None):
         if self.lock_keeper and not self.lock_keeper.lock(self):
             self.logger.info("Another installation is already in progress, aborting")
             return
 
-        self.rauc.Install('(s)', self.bundle_dl_location)
+        self.rauc.Install('(s)', custom_bundle_location or self.bundle_dl_location)
 
     async def process_deployment(self, base):
         """
