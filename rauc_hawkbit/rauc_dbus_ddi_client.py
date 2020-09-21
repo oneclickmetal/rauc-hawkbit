@@ -68,7 +68,7 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         result = parameters[0]
         try:
             os.remove(self.bundle_dl_location)
-        except Error as e:
+        except BaseException as e:
             self.logger.warning('Error removing update bundle')
             self.logger.warning(str(e))
         status_msg = 'Rauc bundle update completed with result: {}'.format(
