@@ -58,14 +58,16 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
     async def complete_callback(self, connection, sender_name, object_path,
                                 interface_name, signal_name, parameters):
         """Callback for completion."""
-        # bundle update was triggered from elsewhere
-        if not self.action_id:
-            return
 
         if self.lock_keeper:
             self.lock_keeper.unlock(self)
 
         result = parameters[0]
+        self.result_callback(result)
+
+        # bundle update was triggered from elsewhere than hawkbit
+        if not self.action_id:
+            return
         try:
             os.remove(self.bundle_dl_location)
         except BaseException as e:
@@ -88,22 +90,22 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
 
         self.action_id = None
 
-        self.result_callback(result)
-
     async def progress_callback(self, connection, sender_name,
                                 object_path, interface_name,
                                 signal_name, parameters):
         """Callback for changed Progress property."""
-        # bundle update was triggered from elsewhere
-        if not self.action_id:
-            return
 
         percentage, description, nesting_depth = parameters
-        self.logger.info('Update progress: {}% {}'.format(percentage,
-                                                          description))
+        self.logger.info(
+            'Update progress: {}% {}'.format(percentage, description)
+        )
 
         if self.step_callback:
             self.step_callback(percentage, description)
+
+        # bundle update was triggered from elsewhere than hawkbit
+        if not self.action_id:
+            return
 
         # send feedback to HawkBit
         status_execution = DeploymentStatusExecution.proceeding
