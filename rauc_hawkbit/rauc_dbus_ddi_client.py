@@ -312,6 +312,13 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
             self.logger.info("Bundle already on disk .. skipping download")
             return
 
+        # As rauc removes write permissions to the file when installing
+        # we need to delete any existing bundles before starting to write to the file
+        try:
+            os.remove(self.bundle_dl_location)
+        except FileNotFoundError:
+            pass
+
         # try several times
         for dl_try in range(tries):
             if not static_api_url:
