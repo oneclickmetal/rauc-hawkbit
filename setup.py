@@ -15,7 +15,7 @@ setup(
       install_requires=[
           'aiohttp==3.9.1',
           'asyncio-glib==0.1',
-          'PyGObject==3.46.0'
+          'PyGObject==3.44.2'
       ],
       packages=find_packages(),
       include_package_data=True,
