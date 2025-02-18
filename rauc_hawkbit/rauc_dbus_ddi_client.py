@@ -157,10 +157,11 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
     async def identify(self, base):
         """Identify target against HawkBit."""
         self.logger.info('Sending identifying information to HawkBit')
+        compatible_string = self.rauc.get_cached_property('Compatible')
         # identify
         await self.ddi.configData(
                 ConfigStatusExecution.closed,
-                ConfigStatusResult.success, **self.attributes)
+                ConfigStatusResult.success, compatible=compatible_string, **self.attributes)
 
     async def reject_cancel(self, base):
         self.logger.info('Received cancelation request')
