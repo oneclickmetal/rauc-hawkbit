@@ -157,7 +157,7 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
     async def identify(self, base):
         """Identify target against HawkBit."""
         self.logger.info('Sending identifying information to HawkBit')
-        compatible_string = self.rauc.get_cached_property('Compatible')
+        compatible_string = self.rauc.get_cached_property('Compatible').get_string()
         # identify
         await self.ddi.configData(
                 ConfigStatusExecution.closed,
