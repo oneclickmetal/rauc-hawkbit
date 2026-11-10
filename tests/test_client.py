@@ -30,7 +30,7 @@ def create_app():
     return app
 
 async def test_get_resource_valid(aiohttp_client):
-    client = await aiohttp_client(create_app)
+    client = await aiohttp_client(create_app())
 
     ddi = DDIClient(client.session, '{}:{}'.format(client.host, client.port), False, None, '/DEFAULT', 'test-target')
     resp = await ddi.get_resource('{tenant}/controller/v1/{controllerId}')
@@ -39,7 +39,7 @@ async def test_get_resource_valid(aiohttp_client):
     assert '_links' in resp
 
 async def test_get_resource_invalid_key(aiohttp_client):
-    client = await aiohttp_client(create_app)
+    client = await aiohttp_client(create_app())
 
     ddi = DDIClient(client.session, '{}:{}'.format(client.host, client.port), False, None, '/DEFAULT', 'test-target')
 
@@ -47,7 +47,7 @@ async def test_get_resource_invalid_key(aiohttp_client):
         resp = await ddi.get_resource('{tenant}/controller/v1/{dummy}')
 
 async def test_get_resource_invalid_path(aiohttp_client):
-    client = await aiohttp_client(create_app)
+    client = await aiohttp_client(create_app())
 
     ddi = DDIClient(client.session, '{}:{}'.format(client.host, client.port), False, None, '/DEFAULT', 'test-target')
 
