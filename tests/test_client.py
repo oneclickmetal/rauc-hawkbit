@@ -24,13 +24,13 @@ async def hello(request):
     }
     return web.json_response(data)
 
-def create_app(loop):
+def create_app():
     app = web.Application()
     app.router.add_route('GET', '/DEFAULT/controller/v1/test-target', hello)
     return app
 
-async def test_get_resource_valid(test_client):
-    client = await test_client(create_app)
+async def test_get_resource_valid(aiohttp_client):
+    client = await aiohttp_client(create_app)
 
     ddi = DDIClient(client.session, '{}:{}'.format(client.host, client.port), False, None, '/DEFAULT', 'test-target')
     resp = await ddi.get_resource('{tenant}/controller/v1/{controllerId}')
@@ -38,16 +38,16 @@ async def test_get_resource_valid(test_client):
     assert 'config' in resp
     assert '_links' in resp
 
-async def test_get_resource_invalid_key(test_client):
-    client = await test_client(create_app)
+async def test_get_resource_invalid_key(aiohttp_client):
+    client = await aiohttp_client(create_app)
 
     ddi = DDIClient(client.session, '{}:{}'.format(client.host, client.port), False, None, '/DEFAULT', 'test-target')
 
     with pytest.raises(KeyError):
         resp = await ddi.get_resource('{tenant}/controller/v1/{dummy}')
 
-async def test_get_resource_invalid_path(test_client):
-    client = await test_client(create_app)
+async def test_get_resource_invalid_path(aiohttp_client):
+    client = await aiohttp_client(create_app)
 
     ddi = DDIClient(client.session, '{}:{}'.format(client.host, client.port), False, None, '/DEFAULT', 'test-target')
 
