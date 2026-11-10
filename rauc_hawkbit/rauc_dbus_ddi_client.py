@@ -19,6 +19,9 @@ from .ddi.deployment_base import (
 from .ddi.cancel_action import (
     CancelStatusExecution, CancelStatusResult)
 
+# report download progress to HawkBit in steps of this many percent
+DOWNLOAD_PROGRESS_STEP_PERCENT = 10
+
 
 class RaucDBUSDDIClient(AsyncDBUSClient):
     """
@@ -295,6 +298,46 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         finally:
             return do_hashes_match
 
+    async def send_progress_feedback(self, action_id, message, **progress):
+        """
+        Report an intermediate 'proceeding' status to HawkBit.
+
+        Failures are only logged: a lost status message must not abort the
+        download it is reporting on.
+        """
+        try:
+            await self.ddi.deploymentBase[action_id].feedback(
+                    DeploymentStatusExecution.proceeding,
+                    DeploymentStatusResult.none, [message], **progress)
+        except Exception as e:
+            self.logger.warning(
+                'Could not send feedback "{}" to HawkBit: {}'.format(message, e))
+
+    def download_progress_reporter(self, action_id,
+                                   step_percent=DOWNLOAD_PROGRESS_STEP_PERCENT):
+        """
+        Build a progress callback for DDIClient.get_binary() which reports
+        the download progress to HawkBit every ``step_percent`` percent.
+        """
+        last_reported = -step_percent
+
+        async def report(bytes_downloaded, total_bytes):
+            nonlocal last_reported
+            if not total_bytes:
+                return
+            percentage = min(100, bytes_downloaded * 100 // total_bytes)
+            if percentage - last_reported < step_percent:
+                return
+            last_reported = percentage
+            self.logger.info('Download progress: {}%'.format(percentage))
+            await self.send_progress_feedback(
+                action_id,
+                'Downloading bundle: {}% ({} of {} bytes)'.format(
+                    percentage, bytes_downloaded, total_bytes),
+                cnt=percentage, of=100)
+
+        return report
+
     async def download_artifact(self, action_id, url, md5sum,
                                 tries=3):
         """Download bundle artifact."""
@@ -311,6 +354,8 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
         bundle_exists = self.bundle_already_downloaded(self.bundle_dl_location, md5sum)
         if bundle_exists:
             self.logger.info("Bundle already on disk .. skipping download")
+            await self.send_progress_feedback(
+                action_id, 'Bundle already downloaded, md5 verified')
             return
 
         # As rauc removes write permissions to the file when installing
@@ -322,17 +367,22 @@ class RaucDBUSDDIClient(AsyncDBUSClient):
 
         # try several times
         for dl_try in range(tries):
+            progress_callback = self.download_progress_reporter(action_id)
             if not static_api_url:
                 checksum = await self.ddi.softwaremodules[software_module] \
-                    .artifacts[filename](self.bundle_dl_location)
+                    .artifacts[filename](self.bundle_dl_location,
+                                         progress_callback=progress_callback)
             else:
                 # API implementations might return static URLs, so bypass API
                 # methods and download bundle anyway
-                checksum = await self.ddi.get_binary(url,
-                                                     self.bundle_dl_location)
+                checksum = await self.ddi.get_binary(
+                    url, self.bundle_dl_location,
+                    progress_callback=progress_callback)
 
             if checksum == md5sum:
                 self.logger.info('Download successful')
+                await self.send_progress_feedback(
+                    action_id, 'Bundle downloaded, md5 verified')
                 return
             else:
                 self.logger.error('Checksum does not match. {} tries remaining'

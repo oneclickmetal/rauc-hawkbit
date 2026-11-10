@@ -172,7 +172,8 @@ class DDIClient(object):
 
     async def get_binary_resource(self, api_path, dl_location,
                                   mime='application/octet-stream',
-                                  timeout=3600, **kwargs):
+                                  timeout=3600, progress_callback=None,
+                                  **kwargs):
         """
         Helper method for binary HTTP GET API requests.
 
@@ -184,6 +185,7 @@ class DDIClient(object):
         Keyword Args:
             mime: mimetype of content to retrieve
                   (default: 'application/octet-stream')
+            progress_callback: see :meth:`get_binary`
             kwargs: Other keyword args used for replacing items in the API path
 
         Returns:
@@ -194,11 +196,12 @@ class DDIClient(object):
                     tenant=self.tenant,
                     controllerId=self.controller_id,
                     **kwargs))
-        return await self.get_binary(url, dl_location, mime, timeout=timeout)
+        return await self.get_binary(url, dl_location, mime, timeout=timeout,
+                                     progress_callback=progress_callback)
 
     async def get_binary(self, url, dl_location,
                          mime='application/octet-stream',
-                         timeout=3600):
+                         timeout=3600, progress_callback=None):
         """
         Actual download method with checksum checking.
 
@@ -210,6 +213,11 @@ class DDIClient(object):
                   (default: 'application/octet-stream')
             timeout: download timeout
                   (default: 3600)
+            progress_callback: optional coroutine function awaited after
+                  every received chunk as
+                  ``progress_callback(bytes_downloaded, total_bytes)``.
+                  ``total_bytes`` is None if the server sends no
+                  Content-Length.
 
         Returns:
             MD5 hash of downloaded content
@@ -229,6 +237,8 @@ class DDIClient(object):
                                     timeout=timeout) as resp:
 
             await self.check_http_status(resp)
+            total_bytes = resp.content_length
+            bytes_downloaded = 0
             with open(dl_location, 'wb') as fd:
                 while True:
                     chunk, _ = await resp.content.readchunk()
@@ -239,6 +249,10 @@ class DDIClient(object):
 
                     fd.write(chunk)
                     hash_md5.update(chunk)
+                    bytes_downloaded += len(chunk)
+
+                    if progress_callback:
+                        await progress_callback(bytes_downloaded, total_bytes)
 
         return hash_md5.hexdigest()
 

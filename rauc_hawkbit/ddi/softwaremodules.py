@@ -10,13 +10,13 @@ class FileName(object):
         self.software_module_id = software_module_id
         self.file_name = file_name
 
-    async def __call__(self, bundle_dl_location):
+    async def __call__(self, bundle_dl_location, progress_callback=None):
         """
         See http://sp.apps.bosch-iot-cloud.com/documentation/rest-api/rootcontroller-api-guide.html#_get_tenant_controller_v1_targetid_softwaremodules_softwaremoduleid_artifacts_filename # noqa
         """
         return await self.ddi.get_binary_resource(
             '/{tenant}/controller/v1/{controllerId}/softwaremodules/{moduleId}/artifacts/{filename}', bundle_dl_location, moduleId=self.software_module_id,
-            filename=self.file_name)
+            filename=self.file_name, progress_callback=progress_callback)
 
     async def MD5SUM(self, md5_dl_location):
         """
