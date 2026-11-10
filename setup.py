@@ -13,7 +13,7 @@ setup(
       url='https://github.com/rauc/rauc-hawkbit',
       setup_requires=['setuptools_scm'],
       install_requires=[
-          'aiohttp==3.9.1',
+          'aiohttp>=3.14.1,<4',
           'asyncio-glib==0.1',
           'PyGObject==3.44.2'
       ],
